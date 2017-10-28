@@ -25,7 +25,7 @@ for i in range(9):
 
 class App():
     def __init__(self, master):
-        self.mode = DIFFICULTY['easy']
+        self.mode = DIFFICULTY['hard']
         self.height = self.mode['height']
         self.width = self.mode['width']
         self.mines = self.mode['mines']
@@ -60,7 +60,8 @@ class App():
 
         # Construct upper display UI
         self.score = Counter(master=self.ui, num=self.mines)
-        self.reset_button = tk.Button(self.ui, image=GIF['smiley'], command=self.restart)
+        self.reset_button = tk.Button(self.ui, image=GIF['smiley'], 
+                                      command=self.restart)
         self.time = Clock(master=self.ui, num=0)
 
         self.score.grid(column=0, row=0, sticky='W')
@@ -170,17 +171,17 @@ class Tile(tk.Button):
             for y2 in range(y-1, y+2):
                 if x2 in range(app.width) and y2 in range(app.height):
                     self.adjacent.append((x2, y2))
-#        print(x,y, self.adjacent)
         self.adjacent.remove((x, y))
-
+        
         self.mines_nearby = 0  # To be incremented by each mine
         self.clicked = False
-        self.flagged = False
-        self.guessed = False
+
         self.bind('<Button-3>', self.flag)  # Bind right-click to flag()
+        self.mark = 0
+        self.marks = [0, 'guess', 'flag']
 
     def click(self):
-        if self.flagged or self.clicked:
+        if self.mark == 2 or self.clicked:
             pass
         else:
             app.swept += 1
@@ -197,20 +198,12 @@ class Tile(tk.Button):
     def flag(self, _):  # The _ is an artifact of the <Button-3> binding
         """Flag, mark with ?, or clear on right-click, accordingly"""
         if self.clicked or app.ended:
-            pass
-        elif self.flagged:
-            app.flags -= 1
-            self['image'] = GIF['guess']
-            self.flagged = False
-            self.guessed = True
-        elif self.guessed:
-            self['image'] = GIF[0]
-            self.guessed = False
+            pass        
         else:
-            app.flags += 1
-            self['image'] = GIF['flag']
-            self.flagged = True
-        app.score.update(app.mines-app.flags)
+            app.flags += (1 - self.mark)  # Increment/decrement total flags
+            self.mark = (self.mark - 1) % 3  # Cycle through blank/flag/mark
+            self['image'] = GIF[self.marks[self.mark]]  # Apply marker icon
+            app.score.update(app.mines-app.flags)  # Update mine count
 
     def sweep(self):
         """Reveal all adjacent tiles with no nearby mines, plus neighbors"""
@@ -231,7 +224,7 @@ class Mine(Tile):
 
     def click(self):
         """Game over, and the fatal mine gets a red background"""
-        if not self.flagged and not self.clicked:
+        if not self.mark == 2 and not self.clicked:
             self.clicked = True
             self['bg'] = 'red'
             self.reveal(GIF['mine'], 'sunken')
