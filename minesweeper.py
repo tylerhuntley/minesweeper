@@ -25,7 +25,7 @@ for i in range(9):
 
 class App():
     def __init__(self, master):
-        self.mode = DIFFICULTY['hard']
+        self.mode = DIFFICULTY['easy']
         self.height = self.mode['height']
         self.width = self.mode['width']
         self.mines = self.mode['mines']
@@ -99,20 +99,12 @@ class App():
             self.button[xy] = mine
             self.mine_list.append(mine)
 
-    def game_over(self, initial, win=False):
+    def game_over(self, win=False):
         self.ended = True
-        self.time.stop()
-        
-        if win:
-            self.reset_button['image'] = GIF['win']
-        else:
-            self.reset_button['image'] = GIF['lose']
-
-        icon = [GIF['mine'], GIF['flag']]
-        relief = ['sunken', 'raised']
+        self.time.stop()        
+        self.reset_button['image'] = (GIF['lose'], GIF['win'])[win]
         for mine in self.mine_list:
-            if not mine is initial:
-                mine.reveal(icon[win], relief[win])
+            mine.reveal(win)
 
     def restart(self):
         if not self.ended:
@@ -174,16 +166,14 @@ class Tile(tk.Button):
         self.adjacent.remove((x, y))
         
         self.mines_nearby = 0  # To be incremented by each mine
-        self.clicked = False
-
-        self.bind('<Button-3>', self.flag)  # Bind right-click to flag()
+        self.clicked = False        
         self.mark = 0
         self.marks = [0, 'guess', 'flag']
+        self.bind('<Button-3>', self.flag)  # Bind right-click to flag()
+
 
     def click(self):
-        if self.mark == 2 or self.clicked:
-            pass
-        else:
+        if self.mark != 2 and not self.clicked:  # Not flagged or clicked
             app.swept += 1
             self.clicked = True
             self['relief'] = 'sunken'
@@ -191,15 +181,13 @@ class Tile(tk.Button):
             self['image'] = self.image
             if not self.mines_nearby:
                 self.sweep()
-
+            # Check win condition
             if app.swept+app.mines == app.height*app.width:
                 app.game_over(None, win=True)
 
     def flag(self, _):  # The _ is an artifact of the <Button-3> binding
         """Flag, mark with ?, or clear on right-click, accordingly"""
-        if self.clicked or app.ended:
-            pass        
-        else:
+        if not self.clicked and not app.ended:
             app.flags += (1 - self.mark)  # Increment/decrement total flags
             self.mark = (self.mark - 1) % 3  # Cycle through blank/flag/mark
             self['image'] = GIF[self.marks[self.mark]]  # Apply marker icon
@@ -224,16 +212,15 @@ class Mine(Tile):
 
     def click(self):
         """Game over, and the fatal mine gets a red background"""
-        if not self.mark == 2 and not self.clicked:
-            self.clicked = True
+        if not self.mark == 2 and not self.clicked:  # Not flagged or clicked
             self['bg'] = 'red'
-            self.reveal(GIF['mine'], 'sunken')
-            app.game_over(self)
+            app.game_over()
 
-    def reveal(self, icon, relief):
+    def reveal(self, win):        
+        icon = [GIF['mine'], GIF['flag']]
+        relief = ['sunken', 'raised']
+        self.config(image=icon[win], relief=relief[win])
         self.clicked = True
-        self['relief'] = relief
-        self['image'] = icon
 
 
 class Digit(tk.Label):
