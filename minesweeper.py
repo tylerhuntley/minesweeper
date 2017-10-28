@@ -11,20 +11,21 @@ root = tk.Tk()
 # Store global reference for each icon, to avoid recreating for each use
 GIF = {'mine':tk.PhotoImage(file='mine.gif'),
        'flag':tk.PhotoImage(file='flag.gif'),
+       'guess':tk.PhotoImage(file='guess.gif'),
        'wrong':tk.PhotoImage(file='wrong.gif'),
        'smiley':tk.PhotoImage(file='smiley.gif'),
        'win':tk.PhotoImage(file='win.gif'),
        'lose':tk.PhotoImage(file='lose.gif'),
-       't':{9:tk.PhotoImage(file='t{}.gif'.format(9)),
+       't':{'9':tk.PhotoImage(file='t9.gif'),
             '-':tk.PhotoImage(file='t-.gif')}}
 for i in range(9):
     GIF[i] = tk.PhotoImage(file=str(i)+'.gif')
-    GIF['t'][i] = tk.PhotoImage(file='t{}.gif'.format(i))
+    GIF['t'][str(i)] = tk.PhotoImage(file='t{}.gif'.format(i))
 
 
 class App():
     def __init__(self, master):
-        self.mode = DIFFICULTY['hard']
+        self.mode = DIFFICULTY['easy']
         self.height = self.mode['height']
         self.width = self.mode['width']
         self.mines = self.mode['mines']
@@ -39,11 +40,14 @@ class App():
 
         self.field = tk.Frame(master, bd=3, padx=2, pady=2, relief='sunken')
         self.ui = tk.Frame(master, bd=3, padx=2, pady=2, relief='sunken')
+        
 
         self.field.grid(row=1)
-        self.ui.grid(row=0)
+        self.ui.grid(row=0, column=0)
+#        self.ui.grid_columnconfigure(0, minsize=(self.width)*15)
+        
 #        self.field.pack(fill='x', side='bottom')
-#        self.ui.pack(fill='x')
+#        self.ui.pack(fill='x', side='top')
 
         # Build button grid for minefield
         self.button = {}
@@ -51,18 +55,19 @@ class App():
             for y in range(self.height):
                 self.button[(x, y)] = Tile(self, x, y, self.field,
                             command=lambda x=x, y=y: self.click(x, y))
-                self.button[(x, y)].grid(column=x, row=y)
+                self.button[(x, y)].grid(column=x, row=y+1)
+        
 
         # Construct upper display UI
         self.score = Counter(master=self.ui, num=self.mines)
         self.reset_button = tk.Button(self.ui, image=GIF['smiley'], command=self.restart)
         self.time = Clock(master=self.ui, num=0)
 
-        self.score.grid(column=0, row=0, sticky='E')
+        self.score.grid(column=0, row=0, sticky='W')
         self.reset_button.grid(column=1, row=0)
         self.time.grid(column=2, row=0, sticky='E')
 #        self.score.pack(side='left')
-#        self.reset_button.pack(fill='y')
+#        self.reset_button.pack(fill='x')
 #        self.time.pack(side='right')
 
     def click(self, x, y):
@@ -88,7 +93,7 @@ class App():
         for xy in random.sample(list(options), self.mines):
             mine = Mine(self, *xy, self.field,
                        command=lambda xy=xy: self.button[xy].click())
-            mine.grid(column=xy[0], row=xy[1])
+            mine.grid(column=xy[0], row=xy[1]+1)
             self.button[xy].grid_remove()
             self.button[xy] = mine
             self.mine_list.append(mine)
@@ -96,13 +101,11 @@ class App():
     def game_over(self, initial, win=False):
         self.ended = True
         self.time.stop()
-
-
-        self.reset_button['image'] = (GIF['lose'], GIF['win'])[win]
-#        if win:
-#            self.reset_button['image'] = GIF['win']
-#        else:
-#            self.reset_button['image'] = GIF['lose']
+        
+        if win:
+            self.reset_button['image'] = GIF['win']
+        else:
+            self.reset_button['image'] = GIF['lose']
 
         icon = [GIF['mine'], GIF['flag']]
         relief = ['sunken', 'raised']
@@ -119,14 +122,16 @@ class App():
 
 
 class Field(tk.Frame):
-    def __init__(self, width, height, *args, **kwargs):
+    def __init__(self, app, width, height, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.width = width
+        self.height = height
 
         # Build width * height grid of minefield Tiles
         self.button = {}
         for x in range(width):
             for y in range(height):
-                self.button[(x, y)] = Tile(self, x, y, self.field,
+                self.button[(x, y)] = Tile(self, x, y,
                             command=lambda x=x, y=y: self.click(x, y))
                 self.button[(x, y)].grid(column=x, row=y)
 
@@ -171,6 +176,7 @@ class Tile(tk.Button):
         self.mines_nearby = 0  # To be incremented by each mine
         self.clicked = False
         self.flagged = False
+        self.guessed = False
         self.bind('<Button-3>', self.flag)  # Bind right-click to flag()
 
     def click(self):
@@ -189,19 +195,20 @@ class Tile(tk.Button):
                 app.game_over(None, win=True)
 
     def flag(self, _):  # The _ is an artifact of the <Button-3> binding
-        """Flag and unflag, accordingly"""
-        if self.clicked:
+        """Flag, mark with ?, or clear on right-click, accordingly"""
+        if self.clicked or app.ended:
             pass
         elif self.flagged:
             app.flags -= 1
-            self.image = GIF[0]
-            self['image'] = self.image
+            self['image'] = GIF['guess']
             self.flagged = False
-
+            self.guessed = True
+        elif self.guessed:
+            self['image'] = GIF[0]
+            self.guessed = False
         else:
             app.flags += 1
-            self.image = GIF['flag']
-            self['image'] = self.image
+            self['image'] = GIF['flag']
             self.flagged = True
         app.score.update(app.mines-app.flags)
 
@@ -237,8 +244,8 @@ class Mine(Tile):
 
 
 class Digit(tk.Label):
-    def __init__(self, x=0, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, x='0', *args, **kwargs):
+        super().__init__(bd=0, *args, **kwargs)
         self.update(x)
 
     def update(self, x):
@@ -251,26 +258,24 @@ class Digit(tk.Label):
 class Counter(tk.Frame):
     def __init__(self, num=0, *args, **kwargs):
         """Assemble three Digit() objects, defaulting to 000."""
-        super().__init__(bd=2, height=23, width=39, *args, **kwargs)
+        super().__init__(bd=3, *args, **kwargs)
         self.digits = []
         for i in range(3):
             self.digits.append(Digit(master=self))
             self.digits[i].grid(row=0, column=i)
         self.update(num)
 
-#        self.icons=['t{}.gif'.format(self.hundreds),
-#                    't{}.gif'.format(self.tens),
-#                    't{}.gif'.format(self.ones)]
-
     def update(self, num):
         self.num = min(num, 999)
-#        self.hundreds = num // 100
-#        self.tens = (num % 100) // 10
-#        self.ones = num % 10
-#        self.nums = [self.hundreds, self.tens, self.ones]
-        self.nums = [self.num // 100,  # Hundreds
-                     (self.num % 100) // 10, # Tens
-                     self.num % 10]  # Ones
+        
+#        self.nums = [self.num // 100,  # Hundreds
+#                     (self.num % 100) // 10, # Tens
+#                     self.num % 10]  # Ones
+        
+        self.nums = [*str(num)]
+        while len(self.nums) < 3:
+            self.nums.insert(0, '0')
+        
 
         for d, x in zip(self.digits, self.nums):
             d.update(x)
