@@ -96,10 +96,13 @@ class App():
     def game_over(self, initial, win=False):
         self.ended = True
         self.time.stop()
-        if win:
-            self.reset_button['image'] = GIF['win']
-        else:
-            self.reset_button['image'] = GIF['lose']
+
+
+        self.reset_button['image'] = (GIF['lose'], GIF['win'])[win]
+#        if win:
+#            self.reset_button['image'] = GIF['win']
+#        else:
+#            self.reset_button['image'] = GIF['lose']
 
         icon = [GIF['mine'], GIF['flag']]
         relief = ['sunken', 'raised']
@@ -113,6 +116,41 @@ class App():
         self.field.grid_remove()
         self.ui.grid_remove()
         self.__init__(root)
+
+
+class Field(tk.Frame):
+    def __init__(self, width, height, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Build width * height grid of minefield Tiles
+        self.button = {}
+        for x in range(width):
+            for y in range(height):
+                self.button[(x, y)] = Tile(self, x, y, self.field,
+                            command=lambda x=x, y=y: self.click(x, y))
+                self.button[(x, y)].grid(column=x, row=y)
+
+    def get_tile(self, x, y):
+        return self.button[(x, y)]
+
+    def click(self, x, y):
+        if not app.started:
+            app.start_game(x, y)
+        if not app.ended:
+            self.get_tile(x, y).click()
+
+    def place_mines(self, x, y):
+        """Place mines randomly, but never on the first clicked square"""
+        self.mines = []
+        options = self.button.copy()
+        del options[(x, y)]  # Remove initial square from options
+        for xy in random.sample(list(options), self.mines):
+            mine = Mine(self, *xy, self.field,
+                       command=lambda xy=xy: self.button[xy].click())
+            mine.grid(column=xy[0], row=xy[1])
+            self.button[xy].grid_remove()
+            self.button[xy] = mine
+            self.mine_list.append(mine)
 
 
 class Tile(tk.Button):
@@ -211,8 +249,9 @@ class Digit(tk.Label):
 
 
 class Counter(tk.Frame):
-    def __init__(self, num, bd=2, height=23, width=39, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, num=0, *args, **kwargs):
+        """Assemble three Digit() objects, defaulting to 000."""
+        super().__init__(bd=2, height=23, width=39, *args, **kwargs)
         self.digits = []
         for i in range(3):
             self.digits.append(Digit(master=self))
@@ -245,7 +284,6 @@ class Clock(Counter):
     def count(self):
         self.num += 1
         self.update(self.num)
-        print(threading.active_count())
         self.start()
 
     def stop(self):
