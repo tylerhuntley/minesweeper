@@ -103,12 +103,12 @@ class App():
         self.ended = True
         self.time.stop()        
         self.reset_button['image'] = (GIF['lose'], GIF['win'])[win]
-        for mine in self.mine_list:
-            mine.reveal(win)
+        for xy in self.button:
+            self.get_tile(*xy).reveal(win)
 
     def restart(self):
         if not self.ended:
-            self.game_over(None)
+            self.game_over()
         self.field.grid_remove()
         self.ui.grid_remove()
         self.__init__(root)
@@ -183,11 +183,11 @@ class Tile(tk.Button):
                 self.sweep()
             # Check win condition
             if app.swept+app.mines == app.height*app.width:
-                app.game_over(None, win=True)
+                app.game_over(win=True)
 
     def flag(self, _):  # The _ is an artifact of the <Button-3> binding
         """Flag, mark with ?, or clear on right-click, accordingly"""
-        if not self.clicked and not app.ended:
+        if not self.clicked and not app.ended and app.started:
             app.flags += (1 - self.mark)  # Increment/decrement total flags
             self.mark = (self.mark - 1) % 3  # Cycle through blank/flag/mark
             self['image'] = GIF[self.marks[self.mark]]  # Apply marker icon
@@ -200,11 +200,14 @@ class Tile(tk.Button):
             if not neighbor.clicked:
                 neighbor.click()
 
+    def reveal(self, win):
+        if self.mark == 2:  # Flagged
+            self.config(image=GIF['wrong'], relief='sunken')
+            
 
 class Mine(Tile):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-#        self['image'] = GIF['mine']
 
         # Increment all nearby tiles' mine counters
         for xy in self.adjacent:
@@ -214,7 +217,7 @@ class Mine(Tile):
         """Game over, and the fatal mine gets a red background"""
         if not self.mark == 2 and not self.clicked:  # Not flagged or clicked
             self['bg'] = 'red'
-            app.game_over()
+            app.game_over(win=False)
 
     def reveal(self, win):        
         icon = [GIF['mine'], GIF['flag']]
