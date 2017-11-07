@@ -8,7 +8,7 @@ DIFFICULTY = {'easy':{'width':9, 'height':9, 'mines':10},
 
 root = tk.Tk()
 
-# Store global reference for each icon, to avoid recreating for each use
+# Store global reference for each icon
 GIF = {'mine':tk.PhotoImage(file='mine.gif'),
        'flag':tk.PhotoImage(file='flag.gif'),
        'guess':tk.PhotoImage(file='guess.gif'),
@@ -25,7 +25,7 @@ for i in range(9):
 
 class App():
     def __init__(self, master):
-        self.mode = DIFFICULTY['easy']
+        self.mode = DIFFICULTY['hard']
         self.height = self.mode['height']
         self.width = self.mode['width']
         self.mines = self.mode['mines']
@@ -35,88 +35,47 @@ class App():
         self.started = False
         self.ended = False
 
-#        frame = tk.Frame(master)
-#        frame.grid()
+        self.frame = tk.Frame(master)
+        self.frame.grid()
 
-        self.field = tk.Frame(master, bd=3, padx=2, pady=2, relief='sunken')
-        self.ui = tk.Frame(master, bd=3, padx=2, pady=2, relief='sunken')
-        
+        self.ui = tk.Frame(master=self.frame, bd=3, padx=2, pady=2, relief='sunken')
+        self.field = Field(self, self.width, self.height, master=self.frame)
 
+        self.ui.grid(row=0)
         self.field.grid(row=1)
-        self.ui.grid(row=0, column=0)
 #        self.ui.grid_columnconfigure(0, minsize=(self.width)*15)
-        
-#        self.field.pack(fill='x', side='bottom')
-#        self.ui.pack(fill='x', side='top')
-
-        # Build button grid for minefield
-        self.button = {}
-        for x in range(self.width):
-            for y in range(self.height):
-                self.button[(x, y)] = Tile(self, x, y, self.field,
-                            command=lambda x=x, y=y: self.click(x, y))
-                self.button[(x, y)].grid(column=x, row=y+1)
-        
 
         # Construct upper display UI
         self.score = Counter(master=self.ui, num=self.mines)
-        self.reset_button = tk.Button(self.ui, image=GIF['smiley'], 
+        self.reset_button = tk.Button(master=self.ui, image=GIF['smiley'], 
                                       command=self.restart)
         self.time = Clock(master=self.ui, num=0)
 
         self.score.grid(column=0, row=0, sticky='W')
         self.reset_button.grid(column=1, row=0)
         self.time.grid(column=2, row=0, sticky='E')
-#        self.score.pack(side='left')
-#        self.reset_button.pack(fill='x')
-#        self.time.pack(side='right')
-
-    def click(self, x, y):
-        if not self.started:
-            self.start_game(x, y)
-        if not self.ended:
-            self.button[(x, y)].click()
-
-    def get_tile(self, x, y):
-        return self.button[(x, y)]
-
+        
     def start_game(self, x, y):
-        # Start the timer here, too...
         self.time.start()
         self.started = True
-        self.place_mines(x, y)
-
-    def place_mines(self, x, y):
-        """Place mines randomly, but never on the first clicked square"""
-        self.mine_list = []
-        options = self.button.copy()
-        del options[(x, y)]  # Remove initial square from options
-        for xy in random.sample(list(options), self.mines):
-            mine = Mine(self, *xy, self.field,
-                       command=lambda xy=xy: self.button[xy].click())
-            mine.grid(column=xy[0], row=xy[1]+1)
-            self.button[xy].grid_remove()
-            self.button[xy] = mine
-            self.mine_list.append(mine)
+        self.field.place_mines(x, y)
 
     def game_over(self, win=False):
         self.ended = True
         self.time.stop()        
         self.reset_button['image'] = (GIF['lose'], GIF['win'])[win]
-        for xy in self.button:
-            self.get_tile(*xy).reveal(win)
+        self.field.reveal(win)
 
     def restart(self):
-        if not self.ended:
+        if not self.ended and self.started:
             self.game_over()
-        self.field.grid_remove()
-        self.ui.grid_remove()
+        self.frame.destroy()
         self.__init__(root)
 
 
 class Field(tk.Frame):
     def __init__(self, app, width, height, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(bd=3, padx=2, pady=2, relief='sunken', *args, **kwargs)
         self.width = width
         self.height = height
 
@@ -124,9 +83,9 @@ class Field(tk.Frame):
         self.button = {}
         for x in range(width):
             for y in range(height):
-                self.button[(x, y)] = Tile(self, x, y,
+                self.button[(x, y)] = Tile(app, x, y, master=self,
                             command=lambda x=x, y=y: self.click(x, y))
-                self.button[(x, y)].grid(column=x, row=y)
+                self.button[(x, y)].grid(column=x, row=y+1)
 
     def get_tile(self, x, y):
         return self.button[(x, y)]
@@ -142,18 +101,21 @@ class Field(tk.Frame):
         self.mines = []
         options = self.button.copy()
         del options[(x, y)]  # Remove initial square from options
-        for xy in random.sample(list(options), self.mines):
-            mine = Mine(self, *xy, self.field,
+        for xy in random.sample(list(options), app.mines):
+            mine = Mine(self, *xy, master=self,
                        command=lambda xy=xy: self.button[xy].click())
-            mine.grid(column=xy[0], row=xy[1])
+            mine.grid(column=xy[0], row=xy[1]+1)
             self.button[xy].grid_remove()
             self.button[xy] = mine
-            self.mine_list.append(mine)
+            
+    def reveal(self, win):
+        for xy in self.button:
+            self.get_tile(*xy).reveal(win)
 
 
 class Tile(tk.Button):
     def __init__(self, app, x, y, *args, **kwargs):
-        super().__init__(width=12, height=12, relief='raised', *args, **kwargs)
+        super().__init__(width=15, height=15, relief='raised', *args, **kwargs)
         self.image = GIF[0]
         self['image'] = self.image
 
@@ -196,7 +158,7 @@ class Tile(tk.Button):
     def sweep(self):
         """Reveal all adjacent tiles with no nearby mines, plus neighbors"""
         for xy in self.adjacent:
-            neighbor = app.get_tile(*xy)
+            neighbor = app.field.get_tile(*xy)
             if not neighbor.clicked:
                 neighbor.click()
 
@@ -211,7 +173,7 @@ class Mine(Tile):
 
         # Increment all nearby tiles' mine counters
         for xy in self.adjacent:
-            app.get_tile(*xy).mines_nearby += 1
+            app.field.get_tile(*xy).mines_nearby += 1
 
     def click(self):
         """Game over, and the fatal mine gets a red background"""
@@ -278,5 +240,12 @@ class Clock(Counter):
         self.t.cancel()
 
 
+def on_close():
+    """Prevents the Timer thread from throwing an exception."""
+    app.restart()
+    root.destroy()
+    
+    
 app = App(root)
+root.protocol('WM_DELETE_WINDOW', on_close)
 root.mainloop()
