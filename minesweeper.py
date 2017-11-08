@@ -25,15 +25,11 @@ for i in range(9):
 
 class App():
     def __init__(self, master):
-        self.mode = DIFFICULTY['hard']
-        self.height = self.mode['height']
-        self.width = self.mode['width']
-        self.mines = self.mode['mines']
-
         self.flags = 0
         self.swept = 0
         self.started = False
         self.ended = False
+        self.set_difficulty['hard']
 
         self.frame = tk.Frame(master)
         self.frame.grid()
@@ -47,11 +43,16 @@ class App():
         self.reset_button = tk.Button(master=self.ui, image=GIF['smiley'], 
                                       command=self.restart)
         self.time = Clock(master=self.ui, num=0)
-
         self.score.grid(column=0, row=0, sticky='W')
         self.reset_button.grid(column=1, row=0)
         self.time.grid(column=2, row=0, sticky='E')
-        
+    
+    def set_difficulty(self, mode):
+        """Set mode = 'easy', 'medium', or 'hard' """
+        self.height = DIFFICULTY[mode]['height']
+        self.width = DIFFICULTY[mode]['width']
+        self.mines = DIFFICULTY[mode]['mines']        
+
     def start_game(self, x, y):
         self.time.start()
         self.started = True
