@@ -37,13 +37,10 @@ class App():
 
         self.frame = tk.Frame(master)
         self.frame.grid()
-
-        self.ui = tk.Frame(master=self.frame, bd=3, padx=2, pady=2, relief='sunken')
+        self.ui = tk.Frame(self.frame, bd=3, padx=2, pady=2, relief='sunken')
         self.field = Field(self, self.width, self.height, master=self.frame)
-
         self.ui.grid(row=0)
         self.field.grid(row=1)
-#        self.ui.grid_columnconfigure(0, minsize=(self.width)*15)
 
         # Construct upper display UI
         self.score = Counter(master=self.ui, num=self.mines)
@@ -69,8 +66,10 @@ class App():
     def restart(self):
         if not self.ended and self.started:
             self.game_over()
-        self.frame.destroy()
-        self.__init__(root)
+        for xy in self.field.buttons:
+            self.field.get_tile(*xy).disarm()
+        self.ended = False
+        self.started = False
 
 
 class Field(tk.Frame):
@@ -80,15 +79,15 @@ class Field(tk.Frame):
         self.height = height
 
         # Build width * height grid of minefield Tiles
-        self.button = {}
+        self.buttons = {}
         for x in range(width):
             for y in range(height):
-                self.button[(x, y)] = Tile(app, x, y, master=self,
+                self.buttons[(x, y)] = Tile(app, x, y, master=self,
                             command=lambda x=x, y=y: self.click(x, y))
-                self.button[(x, y)].grid(column=x, row=y+1)
+                self.buttons[(x, y)].grid(column=x, row=y+1)
 
     def get_tile(self, x, y):
-        return self.button[(x, y)]
+        return self.buttons[(x, y)]
 
     def click(self, x, y):
         if not app.started:
@@ -99,26 +98,19 @@ class Field(tk.Frame):
     def place_mines(self, x, y):
         """Place mines randomly, but never on the first clicked square"""
         self.mines = []
-        options = self.button.copy()
+        options = self.buttons.copy()
         del options[(x, y)]  # Remove initial square from options
         for xy in random.sample(list(options), app.mines):
             self.get_tile(*xy).arm()
-#            mine = Mine(self, *xy, master=self,
-#                       command=lambda xy=xy: self.button[xy].click())
-#            mine.grid(column=xy[0], row=xy[1]+1)
-#            self.button[xy].grid_remove()
-#            self.button[xy] = mine
-            
+
     def reveal(self, win):
-        for xy in self.button:
+        for xy in self.buttons:
             self.get_tile(*xy).reveal(win)
 
 
 class Tile(tk.Button):
     def __init__(self, app, x, y, *args, **kwargs):
         super().__init__(width=15, height=15, relief='raised', *args, **kwargs)
-        self.image = GIF[0]
-        self['image'] = self.image
 
         # Populate list of adjacent tiles, that exist
         self.adjacent = []
@@ -127,20 +119,25 @@ class Tile(tk.Button):
                 if x2 in range(app.width) and y2 in range(app.height):
                     self.adjacent.append((x2, y2))
         self.adjacent.remove((x, y))
-        
-        self.mines_nearby = 0  # To be incremented by each mine
-        self.clicked = False
-        self.is_mine = False
-        
-        self.mark = 0
+
         self.marks = [0, 'guess', 'flag']
-        self.bind('<Button-3>', self.flag)  # Bind right-click to flag()
+        self.bind('<Button-3>', self.flag)  # Bind right-click to flag()       
+        self.disarm()
+
+    def disarm(self):
+        """(Re)Set mine to initial state"""
+        self.is_mine = False
+        self.clicked = False
+        self.mines_nearby = 0
+        self.mark = 0
+        self.config(image=GIF[0], relief='raised', bg='white')
 
     def arm(self):
         self.is_mine = True
         for xy in self.adjacent:
             app.field.get_tile(*xy).mines_nearby += 1
-    
+
+
     def click(self):
         if self.mark != 2 and not self.clicked:  # Not flagged or clicked
             if self.is_mine:
@@ -182,27 +179,6 @@ class Tile(tk.Button):
             self.clicked = True
         elif self.mark == 2:  # If flagged:
             self.config(image=GIF['wrong'], relief='sunken')
-            
-
-#class Mine(Tile):
-#    def __init__(self, *args, **kwargs):
-#        super().__init__(*args, **kwargs)
-#
-#        # Increment all nearby tiles' mine counters
-#        for xy in self.adjacent:
-#            app.field.get_tile(*xy).mines_nearby += 1
-#
-#    def click(self):
-#        """Game over, and the fatal mine gets a red background"""
-#        if not self.mark == 2 and not self.clicked:  # Not flagged or clicked
-#            self['bg'] = 'red'
-#            app.game_over(win=False)
-#
-#    def reveal(self, win):        
-#        icon = [GIF['mine'], GIF['flag']]
-#        relief = ['sunken', 'raised']
-#        self.config(image=icon[win], relief=relief[win])
-#        self.clicked = True
 
 
 class Digit(tk.Label):
